@@ -8,24 +8,22 @@ plt.style.use('ggplot')
 
 from sklearn.ensemble import HistGradientBoostingRegressor
 
-from cluster_experiments.random_splitter import (
-    SwitchbackSplitter,
-    Washover
-)
-from cluster_experiments.power_analysis import PowerAnalysis
-from cluster_experiments.power_analysis import NormalPowerAnalysis
 from cluster_experiments import (
+    NonClusteredSplitter,
     ClusteredSplitter,
-    BalancedClusteredSplitter,
+    SwitchbackSplitter,
+    ConstantWashover,
     ConstantPerturbator,
+    NormalPerturbator,
     ClusteredOLSAnalysis,
+    OLSAnalysis,
     PowerAnalysis,
+    NormalPowerAnalysis,
     AnalysisPlan,
     SimpleMetric,
     Dimension,
     Variant,
-    HypothesisTest,
-    TargetAggregation,
+    HypothesisTest
 )
 
 # %% [markdown]
@@ -82,7 +80,10 @@ data = generate_data(
 data.describe(include='all').T
 
 # %% [markdown]
-# # Clustered Design: AOV Analysis
+# # Clustered Design
+
+# %% [markdown]
+# ### Helper functions
 
 # %%
 def get_cupac_df(
@@ -110,6 +111,9 @@ def get_cupac_df(
         .fillna(0)
     )
     return cupac_df
+
+# %% [markdown]
+# ### Data definition
 
 # %%
 cluster_cols = ['customer_id']
@@ -144,7 +148,7 @@ experiment_design_data = (
 print(f'{experiment_design_data.shape=}')
 
 # %% [markdown]
-# ## Comparisons
+# ## Listing: Simulation-based power estimation under a clustered design
 
 # %%
 splitter = ClusteredSplitter(
@@ -157,9 +161,6 @@ analysis = ClusteredOLSAnalysis(
     cluster_cols=cluster_cols,
     target_col=target_col
 )
-
-# %% [markdown]
-# ### Vanilla Power Analyses: Simulated vs. Analytical
 
 # %%
 sim_power_analysis = PowerAnalysis(
@@ -182,6 +183,9 @@ duration = end - start
 # %%
 print(f'Estimated Power (Simulation): {power_sim:.3f} in {duration:.2f} seconds')
 
+# %% [markdown]
+# ### Compare with analytical approach
+
 # %%
 normal_power_analysis = NormalPowerAnalysis(
     splitter=splitter,
@@ -201,7 +205,7 @@ duration = end - start
 print(f'Estimated Power (Analytical): {power_normal:.3f} in {duration:.2f} seconds')
 
 # %% [markdown]
-# ### Vanilla vs. CUPAC
+# ## Listing: Simulation-based power estimation under a clustered design with CUPAC
 
 # %%
 cupac_training_data = get_cupac_df(
@@ -247,25 +251,10 @@ duration = end - start
 print(f'Estimated Power (Simulation with CUPAC): {power_sim_cupac:.3f} in {duration:.2f} seconds')
 
 # %% [markdown]
-# ## Workflow using Normal Approximation
+# # Non-Clustered Design
 
-# %%
-import time
-import pandas as pd
-import numpy as np
-import seaborn as sns
-from matplotlib import pyplot as plt
-plt.style.use('ggplot')
-
-from sklearn.ensemble import HistGradientBoostingRegressor
-
-from cluster_experiments import (
-    NonClusteredSplitter,
-    ConstantPerturbator,
-    OLSAnalysis,
-    PowerAnalysis,
-    NormalPowerAnalysis
-)
+# %% [markdown]
+# ### Helper function
 
 # %%
 def get_cupac_df(
@@ -284,6 +273,9 @@ def get_cupac_df(
         .fillna(0)
     )
     return cupac_df
+
+# %% [markdown]
+# ### Data definitions
 
 # %%
 feature_cols = [
@@ -342,6 +334,9 @@ experiment_design_data = (
 )
 print(f'{experiment_design_data.shape=}')
 
+# %% [markdown]
+# ## Listing: Comparing power estimations between simulation and analytical approaches
+
 # %%
 splitter = NonClusteredSplitter()
 perturbator = ConstantPerturbator(
@@ -376,7 +371,8 @@ print(f'Estimated Power (Simulation): {sim_power:.3f} in {sim_duration:.2f} seco
 normal_power_analysis = NormalPowerAnalysis(
     splitter=splitter,
     analysis=analysis,
-    target_col=target_col
+    target_col=target_col,
+    time_col=time_col
 )
 start = time.time()
 normal_power = normal_power_analysis.power_analysis(
@@ -390,88 +386,17 @@ normal_duration = end - start
 # %%
 print(f'Estimated Power (Analytical): {normal_power:.3f} in {normal_duration:.2f} seconds')
 
-# %%
-experiment_lengths = np.arange(7, 7*4*3, 7)
+# %% [markdown]
+# ## Listing: Using the `mde_time_line` method
 
 # %%
-analysis = OLSAnalysis(
-    target_col=target_col,
-    covariates = ['estimate_' + target_col]
-)
-
-cupac_power_analysis = NormalPowerAnalysis(
-    splitter=splitter,
-    analysis=analysis,
-    target_col=target_col,
-    time_col=time_col,
-    cupac_model=HistGradientBoostingRegressor(),
-    features_cupac_model=['pre_n_orders']
-)
-
-mde_time_line = cupac_power_analysis.mde_time_line(
-    df = get_cupac_df(
-        pre_df = pre_experiment_data,
-        post_df = experiment_design_data,
-        cluster_cols=cluster_cols
-    ),
-    pre_experiment_df=get_cupac_df(
-        pre_df = cupac_training_data,
-        post_df = pre_experiment_data,
-        cluster_cols=cluster_cols
-    ),
-    experiment_length = experiment_lengths,
-    alpha = 0.05,
-    powers=[0.8]
-)
-mde_time_df = pd.DataFrame(mde_time_line)
-
-# %%
-analysis = OLSAnalysis(
-    target_col=target_col
-)
-normal_power_analysis = NormalPowerAnalysis(
-    splitter=splitter,
-    analysis=analysis,
-    target_col=target_col,
-    time_col=time_col
-)
 mde_time_line = normal_power_analysis.mde_time_line(
     df = experiment_design_data,
-    experiment_length = experiment_lengths,
+    experiment_length = np.arange(7, 7*12, 7),
     alpha = 0.05,
     powers=[0.8]
 )
 mde_time_line_df = pd.DataFrame(mde_time_line)
-
-# %%
-
-
-# %%
-analysis = OLSAnalysis(
-    target_col=target_col,
-    covariates = ['pre_n_orders']
-)
-
-cuped_power_analysis = NormalPowerAnalysis(
-    splitter=splitter,
-    analysis=analysis,
-    target_col=target_col,
-    time_col=time_col
-)
-cuped_mde_time_line = cuped_power_analysis.mde_time_line(
-    df = get_cupac_df(
-        post_df = experiment_design_data,
-        pre_df = pre_experiment_data,
-        cluster_cols=['customer_id']
-    ),
-    experiment_length = experiment_lengths,
-    alpha = 0.05,
-    powers=[0.8]
-)
-cuped_mde_time_line_df = pd.DataFrame(cuped_mde_time_line)
-
-# %%
-fig, ax = plt.subplots(figsize=(5, 5))
 sns.lineplot(
     data=mde_time_line_df,
     x='experiment_length',
@@ -479,114 +404,11 @@ sns.lineplot(
     marker='o'
 )
 
-# %%
-fig, ax = plt.subplots()
-sns.lineplot(
-    data=mde_time_line_df,
-    x='experiment_length',
-    y='mde',
-    marker='o',
-    label = 'Vanilla',
-    ax = ax
-)
-sns.lineplot(
-    data = cuped_mde_time_line_df,
-    x = 'experiment_length',
-     y='mde',
-    marker='o',
-    label = 'CUPED',
-    ax = ax
-)
-
-# %% [markdown]
-# # Analysis
-# Running the experiment for 30 days to detect ~1.5 EUR in AOV change.
-
-# %%
-splitter = ClusteredSplitter(
-    cluster_cols=cluster_cols,
-    treatment_col = 'variant',
-    treatments = ['control', 'treatment']
-)
-experiment_analysis_data = (
-    splitter
-    .assign_treatment_df(
-        df=(
-            get_cupac_df(
-                pre_df=experiment_design_data,
-                post_df=_experiment_analysis_data,
-                cluster_cols=cluster_cols
-            )
-        )
-    )
-)
-
-    
-
-# %%
-metric_average_order_value = SimpleMetric(
-    name = 'order_value',
-    alias = 'AOV'
-)
-
-variants = [
-    Variant(name='control', is_control=True),
-    Variant(name='treatment', is_control=False)
-]
-
-# %%
-test_order_value = HypothesisTest(
-    metric=metric_average_order_value,
-    analysis_type="clustered_ols",
-    analysis_config={
-        "cluster_cols":["customer_id"],
-        'covariates': ['estimate_' + target_col]
-    },
-    cupac_config={
-        'cupac_model': HistGradientBoostingRegressor(),
-        'target_col': target_col,
-        'features_cupac_model': feature_cols
-    }
-)
-
-# %%
-analysis_plan = AnalysisPlan(
-    tests = [test_order_value],
-    variants = variants,
-    variant_col = 'variant',
-    alpha = 0.05
-)
-display(
-    analysis_plan.analyze(
-        exp_data = experiment_analysis_data,
-        pre_exp_data = get_cupac_df(
-            post_df = experiment_design_data,
-            pre_df = pre_experiment_data,
-            cluster_cols=cluster_cols
-        )
-    )
-    .to_dataframe()
-    .T
-)
-
 # %% [markdown]
 # # Switchback
 
-# %%
-import time
-import pandas as pd
-import numpy as np
-import seaborn as sns
-from matplotlib import pyplot as plt
-plt.style.use('ggplot')
-
-from cluster_experiments import (
-    SwitchbackSplitter,
-    ConstantWashover,
-    ConstantPerturbator,
-    ClusteredOLSAnalysis,
-    PowerAnalysis
-)
+# %% [markdown]
+# ### Data Definition
 
 # %%
 target_col = 'order_value'
@@ -600,6 +422,9 @@ experiment_design_data = (
     .reset_index(drop=True)
 )
 print(f'{experiment_design_data.shape=}')
+
+# %% [markdown]
+# ## Listing: Switchback deisgn with simulation-based power estimation
 
 # %%
 washover = ConstantWashover(
@@ -635,19 +460,8 @@ print(f'Estimated Power (Switchback): {switchback_power:.3f}')
 # %% [markdown]
 # # Experiment Analysis
 
-# %%
-from sklearn.ensemble import HistGradientBoostingRegressor
-
-from cluster_experiments import (
-    ClusteredSplitter,
-    NormalPerturbator,
-    ClusteredOLSAnalysis,
-    SimpleMetric,
-    Variant,
-    Dimension,
-    HypothesisTest,
-    AnalysisPlan
-)
+# %% [markdown]
+# ### Helper function
 
 # %%
 def get_cupac_df(
@@ -675,6 +489,9 @@ def get_cupac_df(
         .fillna(0)
     )
     return cupac_df
+
+# %% [markdown]
+# ### Data Definition
 
 # %%
 cluster_cols = ['customer_id']
@@ -708,6 +525,9 @@ _experiment_analysis_data = (
 )
 print(f'{_experiment_analysis_data.shape=}')
 
+# %% [markdown]
+# ### Data pre-processing
+
 # %%
 city_assigner = ClusteredSplitter(
     cluster_cols=cluster_cols,
@@ -734,6 +554,9 @@ experiment_analysis_data = (
     .pipe(treatment_assigner.assign_treatment_df)
     .pipe(treatment_perturbator.perturbate)
 )
+
+# %% [markdown]
+# ## Listing: Experiment analysis example
 
 # %%
 metric__order_value = SimpleMetric(
@@ -797,8 +620,5 @@ analysis_results = (
 
 # %%
 print(analysis_results)
-
-# %%
-
 
 
