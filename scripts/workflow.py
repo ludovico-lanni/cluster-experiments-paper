@@ -174,8 +174,7 @@ start = time.time()
 power_sim = sim_power_analysis.power_analysis(
     df=experiment_design_data,
     average_effect= average_effect,
-    n_simulations = 1000,
-    n_jobs=10
+    n_simulations = 1000
 )
 end = time.time()
 duration = end - start
@@ -241,8 +240,7 @@ power_sim_cupac = sim_power_analysis_cupac.power_analysis(
     df=cupac_experiment_data,
     average_effect= average_effect,
     n_simulations = 100,
-    pre_experiment_df=cupac_training_data,
-    n_jobs=10
+    pre_experiment_df=cupac_training_data
 )
 end = time.time()
 duration = end - start
@@ -358,8 +356,7 @@ start = time.time()
 sim_power = sim_power_analysis.power_analysis(
     df=experiment_design_data,
     average_effect=average_effect,
-    n_simulations=1000,
-    n_jobs=10
+    n_simulations=1000
 )
 end = time.time()
 sim_duration = end - start
@@ -452,8 +449,7 @@ switchback_power_analysis = PowerAnalysis(
 switchback_power = switchback_power_analysis.power_analysis(
     df=experiment_design_data,
     average_effect= average_effect,
-    n_simulations = 100,
-    n_jobs=10
+    n_simulations = 100
 )
 print(f'Estimated Power (Switchback): {switchback_power:.3f}')
 
