@@ -148,7 +148,7 @@ experiment_design_data = (
 print(f'{experiment_design_data.shape=}')
 
 # %% [markdown]
-# ## Listing: Simulation-based power estimation under a clustered design
+# ## Code Chunk: Simulation-based power estimation under a clustered design
 
 # %%
 splitter = ClusteredSplitter(
@@ -174,7 +174,8 @@ start = time.time()
 power_sim = sim_power_analysis.power_analysis(
     df=experiment_design_data,
     average_effect= average_effect,
-    n_simulations = 1000
+    n_simulations = 1000,
+    n_jobs=10
 )
 end = time.time()
 duration = end - start
@@ -204,7 +205,7 @@ duration = end - start
 print(f'Estimated Power (Analytical): {power_normal:.3f} in {duration:.2f} seconds')
 
 # %% [markdown]
-# ## Listing: Simulation-based power estimation under a clustered design with CUPAC
+# ## Code Chunk: Simulation-based power estimation under a clustered design with CUPAC
 
 # %%
 cupac_training_data = get_cupac_df(
@@ -240,7 +241,8 @@ power_sim_cupac = sim_power_analysis_cupac.power_analysis(
     df=cupac_experiment_data,
     average_effect= average_effect,
     n_simulations = 100,
-    pre_experiment_df=cupac_training_data
+    pre_experiment_df=cupac_training_data,
+    n_jobs=10
 )
 end = time.time()
 duration = end - start
@@ -333,7 +335,7 @@ experiment_design_data = (
 print(f'{experiment_design_data.shape=}')
 
 # %% [markdown]
-# ## Listing: Comparing power estimations between simulation and analytical approaches
+# ## Code Chunk: Comparing power estimations between simulation and analytical approaches
 
 # %%
 splitter = NonClusteredSplitter()
@@ -356,7 +358,8 @@ start = time.time()
 sim_power = sim_power_analysis.power_analysis(
     df=experiment_design_data,
     average_effect=average_effect,
-    n_simulations=1000
+    n_simulations=1000,
+    n_jobs=10
 )
 end = time.time()
 sim_duration = end - start
@@ -384,7 +387,7 @@ normal_duration = end - start
 print(f'Estimated Power (Analytical): {normal_power:.3f} in {normal_duration:.2f} seconds')
 
 # %% [markdown]
-# ## Listing: Using the `mde_time_line` method
+# ## Code Chunk: Using the `mde_time_line` method
 
 # %%
 mde_time_line = normal_power_analysis.mde_time_line(
@@ -421,7 +424,7 @@ experiment_design_data = (
 print(f'{experiment_design_data.shape=}')
 
 # %% [markdown]
-# ## Listing: Switchback deisgn with simulation-based power estimation
+# ## Code Chunk: Switchback deisgn with simulation-based power estimation
 
 # %%
 washover = ConstantWashover(
@@ -449,7 +452,8 @@ switchback_power_analysis = PowerAnalysis(
 switchback_power = switchback_power_analysis.power_analysis(
     df=experiment_design_data,
     average_effect= average_effect,
-    n_simulations = 100
+    n_simulations = 100,
+    n_jobs=10
 )
 print(f'Estimated Power (Switchback): {switchback_power:.3f}')
 
@@ -552,7 +556,7 @@ experiment_analysis_data = (
 )
 
 # %% [markdown]
-# ## Listing: Experiment analysis example
+# ## Code Chunk: Experiment analysis example
 
 # %%
 metric__order_value = SimpleMetric(
