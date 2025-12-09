@@ -174,35 +174,13 @@ start = time.time()
 power_sim = sim_power_analysis.power_analysis(
     df=experiment_design_data,
     average_effect= average_effect,
-    n_simulations = 1000,
-    n_jobs=10
+    n_simulations = 100
 )
 end = time.time()
 duration = end - start
 
 # %%
 print(f'Estimated Power (Simulation): {power_sim:.3f} in {duration:.2f} seconds')
-
-# %% [markdown]
-# ### Compare with analytical approach
-
-# %%
-normal_power_analysis = NormalPowerAnalysis(
-    splitter=splitter,
-    analysis=analysis,
-    target_col=target_col
-)
-start = time.time()
-power_normal = normal_power_analysis.power_analysis(
-    df=experiment_design_data,
-    average_effect=average_effect,
-    n_simulations=10,
-)
-end = time.time()
-duration = end - start
-
-# %%
-print(f'Estimated Power (Analytical): {power_normal:.3f} in {duration:.2f} seconds')
 
 # %% [markdown]
 # ## Code Chunk: Simulation-based power estimation under a clustered design with CUPAC
@@ -241,8 +219,7 @@ power_sim_cupac = sim_power_analysis_cupac.power_analysis(
     df=cupac_experiment_data,
     average_effect= average_effect,
     n_simulations = 100,
-    pre_experiment_df=cupac_training_data,
-    n_jobs=10
+    pre_experiment_df=cupac_training_data
 )
 end = time.time()
 duration = end - start
@@ -358,8 +335,7 @@ start = time.time()
 sim_power = sim_power_analysis.power_analysis(
     df=experiment_design_data,
     average_effect=average_effect,
-    n_simulations=1000,
-    n_jobs=10
+    n_simulations=100
 )
 end = time.time()
 sim_duration = end - start
@@ -452,8 +428,7 @@ switchback_power_analysis = PowerAnalysis(
 switchback_power = switchback_power_analysis.power_analysis(
     df=experiment_design_data,
     average_effect= average_effect,
-    n_simulations = 100,
-    n_jobs=10
+    n_simulations = 100
 )
 print(f'Estimated Power (Switchback): {switchback_power:.3f}')
 
@@ -620,5 +595,3 @@ analysis_results = (
 
 # %%
 print(analysis_results)
-
-
