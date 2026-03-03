@@ -35,33 +35,39 @@ def generate_data(sample_size=50_000, seed=42) -> pd.DataFrame:
 
     N_CUSTOMERS = sample_size
     MIN_DATE = pd.Timestamp('2021-01-01')
-    MAX_DATE = MIN_DATE + pd.Timedelta(days=360)
+    MAX_DATE = pd.Timestamp('2021-12-31')
     
     customer_ids = rng.choice(np.arange(1e6, 1e7).astype(int), size=N_CUSTOMERS, replace=False)
+    customer_city_codes = rng.choice(['MAD', 'BCN'], size=N_CUSTOMERS, replace=True, p=[0.7, 0.3])
     beta_samples = rng.beta(2, 5, size=N_CUSTOMERS)
     customer_mean_time_between_orders = 7 + (60 - 7) * (1 - beta_samples) # Every customer has a different mean time between orders
     customer_average_spend = rng.uniform(20, 200, size=N_CUSTOMERS) # Every customer has a different average spend
-    start_times = rng.choice(pd.date_range(MIN_DATE.replace(year=2020), MAX_DATE.replace(year=2020)), size=N_CUSTOMERS, replace=True) # Every customer places their first order sometime in 2020
+    MIN_START_TIME = MIN_DATE.replace(year=2020)
+    MAX_START_TIME = MAX_DATE.replace(year=2020)
+    start_times = rng.choice(pd.date_range(MIN_START_TIME, MAX_START_TIME), size=N_CUSTOMERS, replace=True) # Every customer places their first order sometime in 2020
     orders = []
-    for customer_id, start_time, time_between_orders, avg_spend in zip(
+    for customer_id, customer_city_code, start_time, time_between_orders, avg_spend in zip(
         customer_ids,
+        customer_city_codes,
         start_times,
         customer_mean_time_between_orders,
         customer_average_spend
     ):
         order_time = start_time
         while order_time < MAX_DATE: # Generate orders until MAX_DATE
-            order_time = order_time + pd.Timedelta(days=rng.exponential(scale=time_between_orders))
             if order_time >= MIN_DATE: # Only keep orders after MIN_DATE
                 order_value = np.round(rng.normal(loc=avg_spend, scale=avg_spend * 0.3), 2)
                 orders.append({
                     'customer_id': customer_id,
+                    'city_code': customer_city_code,
                     'order_time': order_time,
                     'order_value': max(0, order_value)
                 })
+            order_time = order_time + pd.Timedelta(days=rng.exponential(scale=time_between_orders))
+
     data = (
         pd.DataFrame(orders)
-        .sample(frac=1, random_state=seed, replace=False)
+        .sample(frac=1, random_state=seed, replace=False) # This just shuffles the data
         .reset_index(drop=True)
         .assign(
             time_index = lambda df: (df['order_time'] - df['order_time'].min()).dt.days
@@ -77,155 +83,130 @@ data = generate_data(
 )
 
 # %%
-data.describe(include='all').T
+print(data.describe(include='all').T)
 
 # %% [markdown]
 # # Clustered Design
 
 # %% [markdown]
-# ### Helper functions
-
-# %%
-def get_cupac_df(
-    pre_df:pd.DataFrame,
-    post_df:pd.DataFrame,
-    cluster_cols: list[str]
-    ) -> pd.DataFrame:
-    agg_pre_df = (
-        pre_df
-        .groupby(
-            by = cluster_cols,
-            as_index = False
-        )
-        .agg(
-            pre_n_orders = ('order_time', 'count'),
-            pre_aov = ('order_value', 'mean')
-        )
-    )
-    cupac_df = (
-        pd.merge(
-            left = post_df,
-            right = agg_pre_df,
-            on = cluster_cols
-        )
-        .fillna(0)
-    )
-    return cupac_df
-
-# %% [markdown]
 # ### Data definition
 
 # %%
-cluster_cols = ['customer_id']
-feature_cols = [
-    'pre_n_orders',
-    'pre_aov'
-]
-target_col = 'order_value'
-time_col = 'order_time'
-average_effect = 1
-
-# %%
-cupac_training_data = (
+data_0_to_90 = (
     data
     .query('time_index < 90')
     .reset_index(drop=True)
 )
-print(f'{cupac_training_data.shape=}')
+print(f'{data_0_to_90.shape=}')
 
-pre_experiment_data = (
+data_90_to_180 = (
     data
     .query('90 <= time_index < 180')
     .reset_index(drop=True)
 )
-print(f'{pre_experiment_data.shape=}')
+print(f'{data_90_to_180.shape=}')
 
-experiment_design_data = (
+data_180_to_270 = (
     data
     .query('180 <= time_index < 270')
     .reset_index(drop=True)
 )
-print(f'{experiment_design_data.shape=}')
+print(f'{data_180_to_270.shape=}')
+
+data_270_to_365 = (
+    data
+    .query('270 <= time_index < 360')
+    .reset_index(drop=True)
+)
+print(f'{data_270_to_365.shape=}')
 
 # %% [markdown]
 # ## Code Chunk: Simulation-based power estimation under a clustered design
 
 # %%
-splitter = ClusteredSplitter(
-    cluster_cols=cluster_cols,
-)
-perturbator = ConstantPerturbator(
-    target_col=target_col
-)
-analysis = ClusteredOLSAnalysis(
-    cluster_cols=cluster_cols,
-    target_col=target_col
-)
 
 # %%
+splitter = ClusteredSplitter(
+    cluster_cols=['customer_id'],
+)
+perturbator = ConstantPerturbator(
+    target_col='order_value'
+)
+analysis = ClusteredOLSAnalysis(
+    cluster_cols=['customer_id'],
+    target_col='order_value'
+)
+
 sim_power_analysis = PowerAnalysis(
     perturbator=perturbator,
     splitter=splitter,
     analysis=analysis,
-    target_col=target_col,
-    seed = 42
+    target_col='order_value',
+    seed=42
 )
-start = time.time()
 power_sim = sim_power_analysis.power_analysis(
-    df=experiment_design_data,
-    average_effect= average_effect,
-    n_simulations = 100
+    df=data_180_to_270,
+    average_effect=1,
+    n_simulations=100
 )
-end = time.time()
-duration = end - start
 
-# %%
-print(f'Estimated Power (Simulation): {power_sim:.3f} in {duration:.2f} seconds')
+print(f'Estimated Power (Simulation without CUPAC): {power_sim:.3f}')
 
 # %% [markdown]
 # ## Code Chunk: Simulation-based power estimation under a clustered design with CUPAC
 
-# %%
-cupac_training_data = get_cupac_df(
-    pre_df = cupac_training_data,
-    post_df = pre_experiment_data,
-    cluster_cols=cluster_cols
+cupac_training_data = pd.merge(
+    left=data_90_to_180,
+    right=(
+        data_0_to_90
+        .groupby('customer_id', as_index=False)
+        .agg(
+            pre_n_orders = ('order_time', 'count'),
+            pre_aov = ('order_value', 'mean')
+        )
+    ),
+    how='left'
 )
-cupac_experiment_data = get_cupac_df(
-    pre_df = pre_experiment_data,
-    post_df = experiment_design_data,
-    cluster_cols=cluster_cols
+cupac_experiment_data = pd.merge(
+    left=data_180_to_270,
+    right=(
+        data_90_to_180
+        .groupby('customer_id', as_index=False)
+        .agg(
+            pre_n_orders = ('order_time', 'count'),
+            pre_aov = ('order_value', 'mean')
+        )
+    ),
+    how='left'
 )
 
-# %%
 analysis = ClusteredOLSAnalysis(
-    cluster_cols=cluster_cols,
-    target_col=target_col,
-    covariates=['estimate_' + target_col]
+    cluster_cols=['customer_id'],
+    target_col='order_value',
+    covariates=['estimate_order_value']
 )
 
-# %%
 sim_power_analysis_cupac = PowerAnalysis(
     perturbator=perturbator,
     splitter=splitter,
     analysis=analysis,
-    target_col=target_col,
+    target_col='order_value',
     cupac_model = HistGradientBoostingRegressor(),
-    features_cupac_model=feature_cols
+    features_cupac_model=['pre_n_orders', 'pre_aov'],
+    seed=42
 )
 
-start = time.time()
 power_sim_cupac = sim_power_analysis_cupac.power_analysis(
     df=cupac_experiment_data,
-    average_effect= average_effect,
+    average_effect= 1,
     n_simulations = 100,
     pre_experiment_df=cupac_training_data
 )
-end = time.time()
-duration = end - start
 
 # %%
-print(f'Estimated Power (Simulation with CUPAC): {power_sim_cupac:.3f} in {duration:.2f} seconds')
+print(f'Estimated Power (Simulation with CUPAC): {power_sim_cupac:.3f}')
+
+raise NotImplementedError('The rest of the workflow is still being implemented. Stay tuned for updates!')
 
 # %% [markdown]
 # # Non-Clustered Design
@@ -293,7 +274,6 @@ pre_experiment_data = (
     .astype({'n_orders': float})
     .reset_index(drop=True)
 )
-print(f'{pre_experiment_data.shape=}')
 
 experiment_design_data = (
     data
@@ -309,7 +289,6 @@ experiment_design_data = (
     .astype({'n_orders': float})
     .reset_index(drop=True)
 )
-print(f'{experiment_design_data.shape=}')
 
 # %% [markdown]
 # ## Code Chunk: Comparing power estimations between simulation and analytical approaches
@@ -373,12 +352,14 @@ mde_time_line = normal_power_analysis.mde_time_line(
     powers=[0.8]
 )
 mde_time_line_df = pd.DataFrame(mde_time_line)
+fig, ax = plt.subplots(figsize=(10, 6))
 sns.lineplot(
     data=mde_time_line_df,
     x='experiment_length',
     y='mde',
     marker='o'
 )
+fig.savefig('mde_time_line.png')
 
 # %% [markdown]
 # # Switchback
@@ -390,14 +371,6 @@ sns.lineplot(
 target_col = 'order_value'
 time_col = 'order_time'
 average_effect = 1
-
-# %%
-experiment_design_data = (
-    data
-    .query('180 <= time_index < 270')
-    .reset_index(drop=True)
-)
-print(f'{experiment_design_data.shape=}')
 
 # %% [markdown]
 # ## Code Chunk: Switchback design with simulation-based power estimation
@@ -478,38 +451,11 @@ target_col = 'order_value'
 time_col = 'order_time'
 average_effect = 1
 
-# %%
-pre_experiment_data = (
-    data
-    .query('90 <= time_index < 180')
-    .reset_index(drop=True)
-)
-print(f'{pre_experiment_data.shape=}')
-
-experiment_design_data = (
-    data
-    .query('180 <= time_index < 270')
-    .reset_index(drop=True)
-)
-print(f'{experiment_design_data.shape=}')
-
-_experiment_analysis_data = (
-    data
-    .query('270 <= time_index < 360')
-    .reset_index(drop=True)
-)
-print(f'{_experiment_analysis_data.shape=}')
 
 # %% [markdown]
 # ### Data pre-processing
 
 # %%
-city_assigner = ClusteredSplitter(
-    cluster_cols=cluster_cols,
-    treatment_col='city_code',
-    treatments=['MAD', 'BCN'],
-    splitter_weights=[0.7, 0.3]
-)
 treatment_assigner = ClusteredSplitter(
     cluster_cols=cluster_cols,
     treatment_col='variant',
@@ -524,8 +470,7 @@ treatment_perturbator = NormalPerturbator(
 )
     
 experiment_analysis_data = (
-    _experiment_analysis_data
-    .pipe(city_assigner.assign_treatment_df)
+    experiment_analysis_data
     .pipe(treatment_assigner.assign_treatment_df)
     .pipe(treatment_perturbator.perturbate)
 )
