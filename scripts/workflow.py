@@ -400,7 +400,7 @@ experiment_design_data = (
 print(f'{experiment_design_data.shape=}')
 
 # %% [markdown]
-# ## Code Chunk: Switchback deisgn with simulation-based power estimation
+# ## Code Chunk: Switchback design with simulation-based power estimation
 
 # %%
 washover = ConstantWashover(
