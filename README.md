@@ -50,7 +50,7 @@ This command reads the `pyproject.toml` file and installs all required libraries
 uv sync
 ```
 
-### 5. Activate the virutal environment.
+### 5. Activate the virtual environment.
 
 This command will activate the virtual environment ensuring that all packages installed are available at runtime.
 
