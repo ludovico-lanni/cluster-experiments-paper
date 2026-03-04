@@ -2,9 +2,15 @@
 import time
 import pandas as pd
 import numpy as np
-import seaborn as sns
 from matplotlib import pyplot as plt
 plt.style.use('ggplot')
+plt.rcParams.update({
+    'font.family': 'serif',
+    'lines.marker': 'o',
+    'lines.markersize': 5,
+    'lines.linewidth': 1,
+    'lines.color': 'black',
+})
 
 from sklearn.ensemble import HistGradientBoostingRegressor
 
@@ -152,6 +158,32 @@ power_sim = sim_power_analysis.power_analysis(
 
 print(f'Estimated Power (Simulation without CUPAC): {power_sim:.3f}')
 
+# >>> splitter = ClusteredSplitter(
+# ...     cluster_cols=['customer_id'],
+# ... )
+# >>> perturbator = ConstantPerturbator(
+# ...     target_col='order_value'
+# ... )
+# >>> analysis = ClusteredOLSAnalysis(
+# ...     cluster_cols=['customer_id'],
+# ...     target_col='order_value'
+# ... )
+# >>> 
+# >>> sim_power_analysis = PowerAnalysis(
+# ...     perturbator=perturbator,
+# ...     splitter=splitter,
+# ...     analysis=analysis,
+# ...     target_col='order_value',
+# ...     seed=42
+# ... )
+# >>> power_sim = sim_power_analysis.power_analysis(
+# ...     df=data_180_to_270,
+# ...     average_effect=1,
+# ...     n_simulations=100
+# ... )
+# >>> 
+# >>> print(f'Estimated Power (Simulation without CUPAC): {power_sim:.3f}')
+
 # %% [markdown]
 # ## Code Chunk: Simulation-based power estimation under a clustered design with CUPAC
 
@@ -203,81 +235,67 @@ power_sim_cupac = sim_power_analysis_cupac.power_analysis(
     pre_experiment_df=cupac_training_data
 )
 
-# %%
 print(f'Estimated Power (Simulation with CUPAC): {power_sim_cupac:.3f}')
 
-raise NotImplementedError('The rest of the workflow is still being implemented. Stay tuned for updates!')
+# >>> cupac_training_data = pd.merge(
+# ...     left=data_90_to_180,
+# ...     right=(
+# ...         data_0_to_90
+# ...         .groupby('customer_id', as_index=False)
+# ...         .agg(
+# ...             pre_n_orders = ('order_time', 'count'),
+# ...             pre_aov = ('order_value', 'mean')
+# ...         )
+# ...     ),
+# ...     how='left'
+# ... )
+# >>> cupac_experiment_data = pd.merge(
+# ...     left=data_180_to_270,
+# ...     right=(
+# ...         data_90_to_180
+# ...         .groupby('customer_id', as_index=False)
+# ...         .agg(
+# ...             pre_n_orders = ('order_time', 'count'),
+# ...             pre_aov = ('order_value', 'mean')
+# ...         )
+# ...     ),
+# ...     how='left'
+# ... )
+# >>> 
+# >>> analysis = ClusteredOLSAnalysis(
+# ...     cluster_cols=['customer_id'],
+# ...     target_col='order_value',
+# ...     covariates=['estimate_order_value']
+# ... )
+# >>> 
+# >>> sim_power_analysis_cupac = PowerAnalysis(
+# ...     perturbator=perturbator,
+# ...     splitter=splitter,
+# ...     analysis=analysis,
+# ...     target_col='order_value',
+# ...     cupac_model = HistGradientBoostingRegressor(),
+# ...     features_cupac_model=['pre_n_orders', 'pre_aov'],
+# ...     seed=42
+# ... )
+# >>> 
+# >>> power_sim_cupac = sim_power_analysis_cupac.power_analysis(
+# ...     df=cupac_experiment_data,
+# ...     average_effect= 1,
+# ...     n_simulations = 100,
+# ...     pre_experiment_df=cupac_training_data
+# ... )
+# >>> 
+# >>> print(f'Estimated Power (Simulation with CUPAC): {power_sim_cupac:.3f}')
 
 # %% [markdown]
 # # Non-Clustered Design
 
 # %% [markdown]
-# ### Helper function
-
-# %%
-def get_cupac_df(
-    pre_df:pd.DataFrame,
-    post_df:pd.DataFrame,
-    cluster_cols: list[str]
-    ) -> pd.DataFrame:
-    cupac_df = (
-        pd.merge(
-            left = post_df,
-            right = pre_df.rename(columns={'n_orders': 'pre_n_orders'}),
-            on = cluster_cols,
-            how='left',
-            suffixes = ('', '_pre')
-        )
-        .fillna(0)
-    )
-    return cupac_df
-
-# %% [markdown]
 # ### Data definitions
 
 # %%
-feature_cols = [
-    'pre_n_orders'
-]
-target_col = 'n_orders'
-time_col = 'first_order_time'
-average_effect = 0.01
-
-# %%
-cupac_training_data = (
-    data
-    .query('time_index < 90')
-    .groupby(
-        by = ['customer_id'],
-        as_index = False
-    )
-    .agg(
-        n_orders = ('order_time', 'count'),
-        first_order_time = ('order_time', 'min')
-    )
-    .astype({'n_orders': float})
-    .reset_index(drop=True)
-)
-print(f'{cupac_training_data.shape=}')
-
-pre_experiment_data = (
-    data
-    .query('90 <= time_index < 180')
-    .groupby(
-        by = ['customer_id'],
-        as_index = False
-    )
-    .agg(
-        n_orders = ('order_time', 'count'),
-        first_order_time = ('order_time', 'min')
-    )
-    .astype({'n_orders': float})
-    .reset_index(drop=True)
-)
-
 experiment_design_data = (
-    data
-    .query('180 <= time_index < 270')
+    data_180_to_270
     .groupby(
         by = ['customer_id'],
         as_index = False
@@ -290,77 +308,161 @@ experiment_design_data = (
     .reset_index(drop=True)
 )
 
-# %% [markdown]
-# ## Code Chunk: Comparing power estimations between simulation and analytical approaches
-
-# %%
 splitter = NonClusteredSplitter()
 perturbator = ConstantPerturbator(
-    target_col=target_col
+    target_col='n_orders'
 )
 analysis = OLSAnalysis(
-    target_col=target_col
+    target_col='n_orders'
 )
 
 sim_power_analysis = PowerAnalysis(
     splitter=splitter,
     perturbator=perturbator,
     analysis=analysis,
-    target_col=target_col,
-    n_simulations=100
+    target_col='n_orders'
 )
 
 start = time.time()
 sim_power = sim_power_analysis.power_analysis(
     df=experiment_design_data,
-    average_effect=average_effect,
-    n_simulations=100
+    average_effect=0.01,
+    n_simulations=500
 )
 end = time.time()
 sim_duration = end - start
-
-# %%
 print(f'Estimated Power (Simulation): {sim_power:.3f} in {sim_duration:.2f} seconds')
+
+# >>> experiment_design_data = (
+# ...     data_180_to_270
+# ...     .groupby(
+# ...         by = ['customer_id'],
+# ...         as_index = False
+# ...     )
+# ...     .agg(
+# ...         n_orders = ('order_time', 'count'),
+# ...         first_order_time = ('order_time', 'min')
+# ...     )
+# ...     .astype({'n_orders': float})
+# ...     .reset_index(drop=True)
+# ... )
+# >>> 
+# >>> splitter = NonClusteredSplitter()
+# >>> perturbator = ConstantPerturbator(
+# ...     target_col='n_orders'
+# ... )
+# >>> analysis = OLSAnalysis(
+# ...     target_col='n_orders'
+# ... )
+# >>> 
+# >>> sim_power_analysis = PowerAnalysis(
+# ...     splitter=splitter,
+# ...     perturbator=perturbator,
+# ...     analysis=analysis,
+# ...     target_col='n_orders'
+# ... )
+# >>> 
+# >>> start = time.time()
+# >>> sim_power = sim_power_analysis.power_analysis(
+# ...     df=experiment_design_data,
+# ...     average_effect=0.01,
+# ...     n_simulations=500
+# ... )
+# >>> end = time.time()
+# >>> sim_duration = end - start
+# >>> print(f'Estimated Power (Simulation): {sim_power:.3f} in {sim_duration:.2f} seconds')
 
 # %%
 normal_power_analysis = NormalPowerAnalysis(
     splitter=splitter,
     analysis=analysis,
-    target_col=target_col,
-    time_col=time_col
+    target_col='n_orders',
 )
+
 start = time.time()
 normal_power = normal_power_analysis.power_analysis(
     df=experiment_design_data,
-    average_effect=average_effect,
-    n_simulations=1
+    average_effect=0.01,
+    n_simulations=10
 )
 end = time.time()
 normal_duration = end - start
 
-# %%
 print(f'Estimated Power (Analytical): {normal_power:.3f} in {normal_duration:.2f} seconds')
+
+# >>> normal_power_analysis = NormalPowerAnalysis(
+# ...     splitter=splitter,
+# ...     analysis=analysis,
+# ...     target_col='n_orders',
+# ... )
+# >>>
+# >>> start = time.time()
+# >>> normal_power = normal_power_analysis.power_analysis(
+# ...     df=experiment_design_data,
+# ...     average_effect=0.01,
+# ...     n_simulations=10
+# ... )
+# >>> end = time.time()
+# >>> normal_duration = end - start
+# >>>
+# >>> print(f'Estimated Power (Analytical): {normal_power:.3f} in {normal_duration:.2f} seconds')
 
 # %% [markdown]
 # ## Code Chunk: Using the `mde_time_line` method
-
-# %%
+normal_power_analysis = NormalPowerAnalysis(
+    splitter=splitter,
+    analysis=analysis,
+    target_col='n_orders',
+    time_col='first_order_time'
+)
 mde_time_line = normal_power_analysis.mde_time_line(
-    df = experiment_design_data,
-    experiment_length = np.arange(7, 7*12, 7),
-    alpha = 0.05,
+    df=experiment_design_data,
+    experiment_length=np.arange(7, 7*12, 7),
+    alpha=0.05,
     powers=[0.8]
 )
 mde_time_line_df = pd.DataFrame(mde_time_line)
-fig, ax = plt.subplots(figsize=(10, 6))
-sns.lineplot(
-    data=mde_time_line_df,
-    x='experiment_length',
-    y='mde',
-    marker='o'
+fig, ax = plt.subplots()
+fig.set_size_inches(9, 5)
+ax.plot(
+    mde_time_line_df['experiment_length'],
+    mde_time_line_df['mde']
 )
+ax.set_xlabel('Experiment Length (days)')
+ax.set_ylabel('Minimum Detectable Effect (MDE)')
+ticks = np.round(np.arange(round(mde_time_line_df['mde'].min(), 2), round(mde_time_line_df['mde'].max()+0.01, 2), step=0.01), 2)
+ax.set_yticks(ticks)
+_ = ax.set_yticklabels([f'{s:1,.2f}' for s in ticks], fontdict={'fontname': 'serif'})
 fig.savefig('mde_time_line.png')
 
+# >>> normal_power_analysis = NormalPowerAnalysis(
+# ...     splitter=splitter,
+# ...     analysis=analysis,
+# ...     target_col='n_orders',
+# ...     time_col='first_order_time'
+# ... )
+# >>> mde_time_line = normal_power_analysis.mde_time_line(
+# ...     df=experiment_design_data,
+# ...     experiment_length=np.arange(7, 7*12, 7),
+# ...     alpha=0.05,
+# ...     powers=[0.8]
+# ... )
+# >>> mde_time_line_df = pd.DataFrame(mde_time_line)
+# >>>
+# >>> fig, ax = plt.subplots()
+# >>> fig.set_size_inches(9, 5)
+# >>> ax.plot(
+# ...     mde_time_line_df['experiment_length'],
+# ...     mde_time_line_df['mde']
+# ... )
+# >>> ax.set_xlabel('Experiment Length (days)')
+# >>> ax.set_ylabel('Minimum Detectable Effect (MDE)')
+# >>> ticks = np.round(np.arange(round(mde_time_line_df['mde'].min(), 2), round(mde_time_line_df['mde'].max()+0.01, 2), step=0.01), 2)
+# >>> ax.set_yticks(ticks)
+# >>> _ = ax.set_yticklabels([f'{s:1,.2f}' for s in ticks])
+# >>>
+# >>> fig.savefig('mde_time_line.png')
+raise NotImplementedError()
 # %% [markdown]
 # # Switchback
 
