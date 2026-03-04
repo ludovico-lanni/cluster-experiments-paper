@@ -1,16 +1,16 @@
 # %%
-import random
 import time
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
+from cycler import cycler
 plt.style.use('ggplot')
 plt.rcParams.update({
     'font.family': 'serif',
     'lines.marker': 'o',
     'lines.markersize': 5,
     'lines.linewidth': 1,
-    'lines.color': 'black',
+    'axes.prop_cycle': cycler(color=['black']),
 })
 
 from sklearn.ensemble import HistGradientBoostingRegressor
@@ -21,7 +21,6 @@ from cluster_experiments import (
     SwitchbackSplitter,
     ConstantWashover,
     ConstantPerturbator,
-    NormalPerturbator,
     ClusteredOLSAnalysis,
     OLSAnalysis,
     PowerAnalysis,
