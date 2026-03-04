@@ -24,7 +24,7 @@ python3 --version
 If you have `pyenv` installed, you can easily install and set the correct Python version for this project.
 
 ```bash
-# Install a compatible Python version (if you don't have one)
+# Install a compatible Python version (if you don't have one), this may take a minute or so.
 pyenv install 3.11.5
 
 # Set the local Python version for this project directory
@@ -34,16 +34,27 @@ pyenv local 3.11.5
 
 Now, your shell will automatically use Python 3.11.5 whenever you are in this directory. You can confirm by running `python --version`.
 
----
+### 3. Install `uv` package manager
 
-### 3. Create and Activate a Virtual Environment
-
-This creates an isolated environment for this project. The command will use the Python version you confirmed or set in the previous step.
+This installs the `uv` package manager which will be used to install the environment and required dependencies, ensuring code reproducibility.
 
 ```bash
-# Create the virtual environment
-python3 -m venv .venv
+pip install uv
+```
 
+### 4. Install Dependencies
+
+This command reads the `pyproject.toml` file and installs all required libraries into a virtual environment created in `.venv`.
+
+```bash
+uv sync
+```
+
+### 5. Activate the virtual environment.
+
+This command will activate the virtual environment ensuring that all packages installed are available at runtime.
+
+```bash
 # Activate it (on macOS/Linux)
 source .venv/bin/activate
 
@@ -53,15 +64,7 @@ source .venv/bin/activate
 
 Your command prompt should now show `(.venv)` at the beginning.
 
-### 4. Install Dependencies
-
-This command reads the `pyproject.toml` file and installs all required libraries into your active virtual environment.
-
-```bash
-pip install -e .
-```
-
-### 5. You're ready to go!
+### 6. You're ready to go!
 
 You can now run the scripts:
 
