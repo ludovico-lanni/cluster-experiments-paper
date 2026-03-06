@@ -584,6 +584,7 @@ print(f'Estimated Power (Switchback): {switchback_power:.3f}')
 
 # %%
 # Prepare CUPAC training data
+
 random.seed(42)
 np.random.seed(42)
 
@@ -600,7 +601,6 @@ perturbator = NormalPerturbator(
     average_effect=1,
     scale=1
 )
-
 
 cupac_training_data = pd.merge(
     left=data_180_to_270,
