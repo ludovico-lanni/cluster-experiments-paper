@@ -2,6 +2,7 @@
 import time
 import pandas as pd
 import numpy as np
+from scipy.stats import norm
 import random
 from matplotlib import pyplot as plt
 from cycler import cycler
@@ -23,6 +24,7 @@ from cluster_experiments import (
     SwitchbackSplitter,
     ConstantWashover,
     ConstantPerturbator,
+    ExperimentAnalysis,
     ClusteredOLSAnalysis,
     OLSAnalysis,
     PowerAnalysis,
@@ -465,6 +467,101 @@ fig.savefig('mde_time_line.png')
 # >>> _ = ax.set_yticklabels([f'{s:1,.2f}' for s in ticks])
 # >>>
 # >>> fig.savefig('mde_time_line.png')
+
+# # Custom Analysis Class
+# ## Code Chunk: Boostrap analysis
+
+# Custom analysis definition
+class SimpleBootstrapNormalAnalysis(ExperimentAnalysis):
+    """
+    Bootstrap analysis using Normal Approximation.
+    Constructs CIs and P-values using the bootstrap Standard Error
+    and the Normal distribution.
+    """
+
+    def __init__(self, n_bootstrap: int = 1000, seed: int = None, **kwargs):
+        super().__init__(cluster_cols=[], **kwargs)
+        self.n_bootstrap = n_bootstrap
+        self.rng = np.random.default_rng(seed)
+
+    def analysis_point_estimate(self, df: pd.DataFrame) -> float:
+        means = df.groupby(self.treatment_col)[self.target_col].mean()
+        return means.get(1, 0) - means.get(0, 0)
+
+    def analysis_standard_error(self, df: pd.DataFrame) -> float:
+        """Calculates SE as the standard deviation of bootstrap ATEs"""
+        boot_ates = [
+            self.analysis_point_estimate(
+                df = (
+                    df
+                    .sample(
+                        frac=1.0, 
+                        replace=True, 
+                        random_state=self.rng.integers(0, 1e9)
+                    )
+                )
+            )
+            for _ in range(self.n_bootstrap)
+        ]
+        return np.std(boot_ates, ddof=1)
+
+    def analysis_pvalue(self, df: pd.DataFrame, verbose: bool = False) -> float:
+        """Two-sided p-value using Z-score = ATE / SE"""
+        ate = self.analysis_point_estimate(df)
+        se = self.analysis_standard_error(df)
+
+        z_score = ate / se
+        return 2 * (1 - norm.cdf(abs(z_score)))
+    
+# Power analysis
+splitter = NonClusteredSplitter()
+perturbator = ConstantPerturbator(
+    target_col='n_orders'
+)
+analysis = SimpleBootstrapNormalAnalysis(
+    n_bootstrap=100,
+    seed=42,
+    target_col='n_orders'
+)
+
+custom_power_analysis = PowerAnalysis(
+    splitter=splitter,
+    perturbator=perturbator,
+    analysis=analysis,
+    target_col='n_orders',
+    seed=42
+)
+
+custom_power = custom_power_analysis.power_analysis(
+    df=experiment_design_data,
+    average_effect=0.01,
+    n_simulations=100
+)
+print(f'Estimated Power (Custom Implementation): {custom_power:.3f}')
+
+# >>> splitter = NonClusteredSplitter()
+# >>> perturbator = ConstantPerturbator(
+# ...     target_col='n_orders'
+# ... )
+# >>> analysis = SimpleBootstrapNormalAnalysis(
+# ...     n_bootstrap=100,
+# ...     seed=42,
+# ...     target_col='n_orders'
+# ... )
+# >>> custom_power_analysis = PowerAnalysis(
+# ...     splitter=splitter,
+# ...     perturbator=perturbator,
+# ...     analysis=analysis,
+# ...     target_col='n_orders',
+# ...     seed=42
+# ... )
+# >>> custom_power = custom_power_analysis.power_analysis(
+# ...     df=experiment_design_data,
+# ...     average_effect=0.01,
+# ...     n_simulations=100
+# ... )
+# >>> print(f'Estimated Power (Custom Implementation): {custom_power:.3f}')
+
 
 # %% [markdown]
 # # Switchback Design
