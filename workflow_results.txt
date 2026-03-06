@@ -16,8 +16,8 @@ data_180_to_270.shape=(104641, 5)
 data_270_to_365.shape=(104396, 5)
 Estimated Power (Simulation without CUPAC): 0.340
 Estimated Power (Simulation with CUPAC): 0.830
-Estimated Power (Simulation): 0.120 in 1.95 seconds
-Estimated Power (Analytical): 0.116 in 0.17 seconds
+Estimated Power (Simulation): 0.120 in 1.77 seconds
+Estimated Power (Analytical): 0.116 in 0.15 seconds
 Estimated Power (Switchback): 0.610
                                         0              1              2
 metric_alias                          AOV            AOV            AOV
