@@ -582,26 +582,7 @@ print(f'Estimated Power (Switchback): {switchback_power:.3f}')
 # %% [markdown]
 # ### Data pre-processing
 
-# %%
 # Prepare CUPAC training data
-
-random.seed(42)
-np.random.seed(42)
-
-splitter = ClusteredSplitter(
-    cluster_cols=['customer_id'],
-    treatments=['A', 'B'],
-    treatment_col='variant'
-)
-
-perturbator = NormalPerturbator(
-    target_col='order_value',
-    treatment_col='variant',
-    treatment='B',
-    average_effect=1,
-    scale=1
-)
-
 cupac_training_data = pd.merge(
     left=data_180_to_270,
     right=(
@@ -616,22 +597,26 @@ cupac_training_data = pd.merge(
     on='customer_id'
 )
 # Prepare simulated experimental data
+random.seed(42)
+np.random.seed(42)
+
+splitter = ClusteredSplitter(
+    cluster_cols=['customer_id'],
+    treatments=['A', 'B'],
+    treatment_col='variant'
+)
+perturbator = NormalPerturbator(
+    target_col='order_value',
+    treatment_col='variant',
+    treatment='B',
+    average_effect=1,
+    scale=1
+)
 experiment_analysis_data = pd.merge(
     left = (
         data_270_to_365
         .pipe(splitter.assign_treatment_df)
         .pipe(perturbator.perturbate)
-        # .assign(
-        #     variant = lambda df: (
-        #         df.loc[:, 'customer_id']
-        #         .map(lambda x: np.random.default_rng(seed=x).choice(['A', 'B'], p=[0.5, 0.5]))
-        #     ),
-        #     order_value = lambda df: (
-        #         df.loc[:, 'order_value']
-        #          + (df.loc[:, 'variant'] == 'B').astype(float)
-        #          * np.random.default_rng(seed=42).normal(loc=1, scale=1, size=df.shape[0])
-        #     )
-        # )
     ),
     right = (
         data_180_to_270
@@ -661,7 +646,7 @@ variant__treatment = Variant(
     name='B',
     is_control=False
 )
-
+# Setup Hypothesis Test
 test__order_value = HypothesisTest(
     metric = metric__order_value,
     dimensions=[dimension__city_code],
@@ -677,7 +662,7 @@ test__order_value = HypothesisTest(
         'features_cupac_model': ['pre_n_orders', 'pre_aov']
     }
 )
-
+# Build analysis plan and run analysis
 analysis_plan = AnalysisPlan(
     tests = [test__order_value],
     variants = [variant__control, variant__treatment],
@@ -709,20 +694,26 @@ print(analysis_results.round(2).T)
 # ...     on='customer_id'
 # ... )
 # >>> # Prepare simulated experimental data
+# >>> random.seed(42)
+# >>> np.random.seed(42)
+# ... 
+# >>> splitter = ClusteredSplitter(
+# ...     cluster_cols=['customer_id'],
+# ...     treatments=['A', 'B'],
+# ...     treatment_col='variant'
+# ... )
+# >>> perturbator = NormalPerturbator(
+# ...     target_col='order_value',
+# ...     treatment_col='variant',
+# ...     treatment='B',
+# ...     average_effect=1,
+# ...     scale=1
+# ... )
 # >>> experiment_analysis_data = pd.merge(
 # ...     left = (
 # ...         data_270_to_365
-# ...         .assign(
-# ...             variant = lambda df: (
-# ...                 df.loc[:, 'customer_id']
-# ...                 .map(lambda x: np.random.default_rng(seed=x).choice(['A', 'B'], p=[0.5, 0.5]))
-# ...             ),
-# ...             order_value = lambda df: (
-# ...                 df.loc[:, 'order_value']
-# ...                  + (df.loc[:, 'variant'] == 'B').astype(float)
-# ...                  * np.random.default_rng(seed=42).normal(loc=1, scale=1, size=df.shape[0])
-# ...             )
-# ...         )
+# ...         .pipe(splitter.assign_treatment_df)
+# ...         .pipe(perturbator.perturbate)
 # ...     ),
 # ...     right = (
 # ...         data_180_to_270
@@ -752,7 +743,7 @@ print(analysis_results.round(2).T)
 # ...     name='B',
 # ...     is_control=False
 # ... )
-# ... 
+# >>> # Setup Hypothesis Test
 # >>> test__order_value = HypothesisTest(
 # ...     metric = metric__order_value,
 # ...     dimensions=[dimension__city_code],
@@ -768,7 +759,7 @@ print(analysis_results.round(2).T)
 # ...         'features_cupac_model': ['pre_n_orders', 'pre_aov']
 # ...     }
 # ... )
-# ... 
+# >>> # Build analysis plan and run analysis
 # >>> analysis_plan = AnalysisPlan(
 # ...     tests = [test__order_value],
 # ...     variants = [variant__control, variant__treatment],
