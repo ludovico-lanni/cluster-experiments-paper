@@ -2,6 +2,8 @@
 import time
 import pandas as pd
 import numpy as np
+from scipy.stats import norm
+import random
 from matplotlib import pyplot as plt
 from cycler import cycler
 plt.style.use('ggplot')
@@ -18,9 +20,11 @@ from sklearn.ensemble import HistGradientBoostingRegressor
 from cluster_experiments import (
     NonClusteredSplitter,
     ClusteredSplitter,
+    NormalPerturbator,
     SwitchbackSplitter,
     ConstantWashover,
     ConstantPerturbator,
+    ExperimentAnalysis,
     ClusteredOLSAnalysis,
     OLSAnalysis,
     PowerAnalysis,
@@ -34,6 +38,7 @@ from cluster_experiments import (
 
 # %% [markdown]
 # # Data Generation
+
 
 # %%
 def generate_data(sample_size=50_000, seed=42) -> pd.DataFrame:
@@ -90,9 +95,6 @@ data = generate_data(
 data.info()
 
 # %% [markdown]
-# # Clustered Design
-
-# %% [markdown]
 # ### Data definition
 
 # %%
@@ -125,11 +127,12 @@ data_270_to_365 = (
 print(f'{data_270_to_365.shape=}')
 
 # %% [markdown]
+# # Clustered Design
+
 # ## Code Chunk: Simulation-based power estimation under a clustered design
 
 # %%
 
-# %%
 splitter = ClusteredSplitter(
     cluster_cols=['customer_id'],
 )
@@ -156,35 +159,10 @@ power_sim = sim_power_analysis.power_analysis(
 
 print(f'Estimated Power (Simulation without CUPAC): {power_sim:.3f}')
 
-# >>> splitter = ClusteredSplitter(
-# ...     cluster_cols=['customer_id'],
-# ... )
-# >>> perturbator = ConstantPerturbator(
-# ...     target_col='order_value'
-# ... )
-# >>> analysis = ClusteredOLSAnalysis(
-# ...     cluster_cols=['customer_id'],
-# ...     target_col='order_value'
-# ... )
-# >>> 
-# >>> sim_power_analysis = PowerAnalysis(
-# ...     perturbator=perturbator,
-# ...     splitter=splitter,
-# ...     analysis=analysis,
-# ...     target_col='order_value',
-# ...     seed=42
-# ... )
-# >>> power_sim = sim_power_analysis.power_analysis(
-# ...     df=data_180_to_270,
-# ...     average_effect=1,
-# ...     n_simulations=100
-# ... )
-# >>> 
-# >>> print(f'Estimated Power (Simulation without CUPAC): {power_sim:.3f}')
-
 # %% [markdown]
 # ## Code Chunk: Simulation-based power estimation under a clustered design with CUPAC
 
+# %%
 cupac_training_data = pd.merge(
     left=data_90_to_180,
     right=(
@@ -234,61 +212,9 @@ power_sim_cupac = sim_power_analysis_cupac.power_analysis(
 )
 
 print(f'Estimated Power (Simulation with CUPAC): {power_sim_cupac:.3f}')
-
-# >>> cupac_training_data = pd.merge(
-# ...     left=data_90_to_180,
-# ...     right=(
-# ...         data_0_to_90
-# ...         .groupby('customer_id', as_index=False)
-# ...         .agg(
-# ...             pre_n_orders = ('order_time', 'count'),
-# ...             pre_aov = ('order_value', 'mean')
-# ...         )
-# ...     ),
-# ...     how='left'
-# ... )
-# >>> cupac_experiment_data = pd.merge(
-# ...     left=data_180_to_270,
-# ...     right=(
-# ...         data_90_to_180
-# ...         .groupby('customer_id', as_index=False)
-# ...         .agg(
-# ...             pre_n_orders = ('order_time', 'count'),
-# ...             pre_aov = ('order_value', 'mean')
-# ...         )
-# ...     ),
-# ...     how='left'
-# ... )
-# >>> 
-# >>> analysis = ClusteredOLSAnalysis(
-# ...     cluster_cols=['customer_id'],
-# ...     target_col='order_value',
-# ...     covariates=['estimate_order_value']
-# ... )
-# >>> 
-# >>> sim_power_analysis_cupac = PowerAnalysis(
-# ...     perturbator=perturbator,
-# ...     splitter=splitter,
-# ...     analysis=analysis,
-# ...     target_col='order_value',
-# ...     cupac_model = HistGradientBoostingRegressor(),
-# ...     features_cupac_model=['pre_n_orders', 'pre_aov'],
-# ...     seed=42
-# ... )
-# >>> 
-# >>> power_sim_cupac = sim_power_analysis_cupac.power_analysis(
-# ...     df=cupac_experiment_data,
-# ...     average_effect= 1,
-# ...     n_simulations = 100,
-# ...     pre_experiment_df=cupac_training_data
-# ... )
-# >>> 
-# >>> print(f'Estimated Power (Simulation with CUPAC): {power_sim_cupac:.3f}')
-
 # %% [markdown]
 # # Non-Clustered Design
 
-# %% [markdown]
 # ### Data definitions
 
 # %%
@@ -332,45 +258,6 @@ end = time.time()
 sim_duration = end - start
 print(f'Estimated Power (Simulation): {sim_power:.3f} in {sim_duration:.2f} seconds')
 
-# >>> experiment_design_data = (
-# ...     data_180_to_270
-# ...     .groupby(
-# ...         by = ['customer_id'],
-# ...         as_index = False
-# ...     )
-# ...     .agg(
-# ...         n_orders = ('order_time', 'count'),
-# ...         first_order_time = ('order_time', 'min')
-# ...     )
-# ...     .astype({'n_orders': float})
-# ...     .reset_index(drop=True)
-# ... )
-# >>> 
-# >>> splitter = NonClusteredSplitter()
-# >>> perturbator = ConstantPerturbator(
-# ...     target_col='n_orders'
-# ... )
-# >>> analysis = OLSAnalysis(
-# ...     target_col='n_orders'
-# ... )
-# >>> 
-# >>> sim_power_analysis = PowerAnalysis(
-# ...     splitter=splitter,
-# ...     perturbator=perturbator,
-# ...     analysis=analysis,
-# ...     target_col='n_orders'
-# ... )
-# >>> 
-# >>> start = time.time()
-# >>> sim_power = sim_power_analysis.power_analysis(
-# ...     df=experiment_design_data,
-# ...     average_effect=0.01,
-# ...     n_simulations=100
-# ... )
-# >>> end = time.time()
-# >>> sim_duration = end - start
-# >>> print(f'Estimated Power (Simulation): {sim_power:.3f} in {sim_duration:.2f} seconds')
-
 # %%
 normal_power_analysis = NormalPowerAnalysis(
     splitter=splitter,
@@ -390,25 +277,10 @@ normal_duration = end - start
 
 print(f'Estimated Power (Analytical): {normal_power:.3f} in {normal_duration:.2f} seconds')
 
-# >>> normal_power_analysis = NormalPowerAnalysis(
-# ...     splitter=splitter,
-# ...     analysis=analysis,
-# ...     target_col='n_orders',
-# ... )
-# >>>
-# >>> start = time.time()
-# >>> normal_power = normal_power_analysis.power_analysis(
-# ...     df=experiment_design_data,
-# ...     average_effect=0.01,
-# ...     n_simulations=10
-# ... )
-# >>> end = time.time()
-# >>> normal_duration = end - start
-# >>>
-# >>> print(f'Estimated Power (Analytical): {normal_power:.3f} in {normal_duration:.2f} seconds')
-
 # %% [markdown]
 # ## Code Chunk: Using the `mde_time_line` method
+
+# %%
 normal_power_analysis = NormalPowerAnalysis(
     splitter=splitter,
     analysis=analysis,
@@ -436,36 +308,84 @@ ax.set_yticks(ticks)
 _ = ax.set_yticklabels([f'{s:1,.2f}' for s in ticks], fontdict={'fontname': 'serif'})
 fig.savefig('mde_time_line.png')
 
-# >>> normal_power_analysis = NormalPowerAnalysis(
-# ...     splitter=splitter,
-# ...     analysis=analysis,
-# ...     target_col='n_orders',
-# ...     time_col='first_order_time'
-# ... )
-# >>> mde_time_line = normal_power_analysis.mde_time_line(
-# ...     df=experiment_design_data,
-# ...     experiment_length=np.arange(7, 7*12, 7),
-# ...     alpha=0.05,
-# ...     powers=[0.8]
-# ... )
-# >>> mde_time_line_df = pd.DataFrame(mde_time_line)
-# >>>
-# >>> fig, ax = plt.subplots()
-# >>> fig.set_size_inches(9, 5)
-# >>> ax.plot(
-# ...     mde_time_line_df['experiment_length'],
-# ...     mde_time_line_df['mde']
-# ... )
-# >>> ax.set_xlabel('Experiment Length (days)')
-# >>> ax.set_ylabel('Minimum Detectable Effect (MDE)')
-# >>> ticks = np.round(np.arange(round(mde_time_line_df['mde'].min(), 2), round(mde_time_line_df['mde'].max()+0.01, 2), step=0.01), 2)
-# >>> ax.set_yticks(ticks)
-# >>> _ = ax.set_yticklabels([f'{s:1,.2f}' for s in ticks])
-# >>>
-# >>> fig.savefig('mde_time_line.png')
+# %% [markdown]
+# # Custom Analysis Class
+
+# ## Code Chunk: Boostrap analysis
+
+
+# %%
+# Custom analysis definition
+class SimpleBootstrapNormalAnalysis(ExperimentAnalysis):
+    """
+    Bootstrap analysis using Normal Approximation.
+    Constructs CIs and P-values using the bootstrap Standard Error
+    and the Normal distribution.
+    """
+
+    def __init__(self, n_bootstrap: int = 1000, seed: int = None, **kwargs):
+        super().__init__(cluster_cols=[], **kwargs)
+        self.n_bootstrap = n_bootstrap
+        self.rng = np.random.default_rng(seed)
+
+    def analysis_point_estimate(self, df: pd.DataFrame) -> float:
+        means = df.groupby(self.treatment_col)[self.target_col].mean()
+        return means.get(1, 0) - means.get(0, 0)
+
+    def analysis_standard_error(self, df: pd.DataFrame) -> float:
+        """Calculates SE as the standard deviation of bootstrap ATEs"""
+        boot_ates = [
+            self.analysis_point_estimate(
+                df = (
+                    df
+                    .sample(
+                        frac=1.0, 
+                        replace=True, 
+                        random_state=self.rng.integers(0, 1e9)
+                    )
+                )
+            )
+            for _ in range(self.n_bootstrap)
+        ]
+        return np.std(boot_ates, ddof=1)
+
+    def analysis_pvalue(self, df: pd.DataFrame, verbose: bool = False) -> float:
+        """Two-sided p-value using Z-score = ATE / SE"""
+        ate = self.analysis_point_estimate(df)
+        se = self.analysis_standard_error(df)
+
+        z_score = ate / se
+        return 2 * (1 - norm.cdf(abs(z_score)))
+    
+# Power analysis
+splitter = NonClusteredSplitter()
+perturbator = ConstantPerturbator(
+    target_col='n_orders'
+)
+analysis = SimpleBootstrapNormalAnalysis(
+    n_bootstrap=100,
+    seed=42,
+    target_col='n_orders'
+)
+
+custom_power_analysis = PowerAnalysis(
+    splitter=splitter,
+    perturbator=perturbator,
+    analysis=analysis,
+    target_col='n_orders',
+    seed=42
+)
+
+custom_power = custom_power_analysis.power_analysis(
+    df=experiment_design_data,
+    average_effect=0.01,
+    n_simulations=100
+)
+print(f'Estimated Power (Custom Implementation): {custom_power:.3f}')
 
 # %% [markdown]
 # # Switchback Design
+
 # ## Code Chunk: Switchback design with simulation-based power estimation
 
 # %%
@@ -499,86 +419,8 @@ switchback_power = switchback_power_analysis.power_analysis(
 )
 print(f'Estimated Power (Switchback): {switchback_power:.3f}')
 
-# >>> washover = ConstantWashover(
-# ...     washover_time_delta='30m'
-# ... )
-# >>> splitter = SwitchbackSplitter(
-# ...     time_col='order_time',
-# ...     switch_frequency='1h',
-# ...     cluster_cols=['order_time'],
-# ...     washover=washover
-# ... )
-# >>> perturbator = ConstantPerturbator(
-# ...     target_col='order_value'
-# ... )
-# >>> analysis = ClusteredOLSAnalysis(
-# ...     cluster_cols=['order_time'],
-# ...     target_col='order_value'
-# ... )
-# >>> 
-# >>> switchback_power_analysis = PowerAnalysis(
-# ...     splitter=splitter,
-# ...     perturbator=perturbator,
-# ...     analysis=analysis,
-# ...     target_col='order_value'
-# ... )
-# >>> switchback_power = switchback_power_analysis.power_analysis(
-# ...     df=data_180_to_270,
-# ...     average_effect=1,
-# ...     n_simulations=100
-# ... )
-# >>> 
-# >>> print(f'Estimated Power (Switchback): {switchback_power:.3f}')
-
 # %% [markdown]
 # # Experiment Analysis
-
-# %% [markdown]
-# ### Helper function
-
-# %%
-# def get_cupac_df(
-#     pre_df:pd.DataFrame,
-#     post_df:pd.DataFrame,
-#     cluster_cols: list[str]
-#     ) -> pd.DataFrame:
-#     agg_pre_df = (
-#         pre_df
-#         .groupby(
-#             by = cluster_cols,
-#             as_index = False
-#         )
-#         .agg(
-#             pre_n_orders = ('order_time', 'count'),
-#             pre_aov = ('order_value', 'mean')
-#         )
-#     )
-#     cupac_df = (
-#         pd.merge(
-#             left = post_df,
-#             right = agg_pre_df,
-#             on = cluster_cols
-#         )
-#         .fillna(0)
-#     )
-#     return cupac_df
-
-# %% [markdown]
-# ### Data Definition
-
-# %%
-# cluster_cols = ['customer_id']
-# feature_cols = [
-#     'pre_n_orders',
-#     'pre_aov'
-# ]
-# target_col = 'order_value'
-# time_col = 'order_time'
-# average_effect = 1
-
-
-# %% [markdown]
-# ### Data pre-processing
 
 # %%
 # Prepare CUPAC training data
@@ -596,20 +438,26 @@ cupac_training_data = pd.merge(
     on='customer_id'
 )
 # Prepare simulated experimental data
+random.seed(42)
+np.random.seed(42)
+
+splitter = ClusteredSplitter(
+    cluster_cols=['customer_id'],
+    treatments=['A', 'B'],
+    treatment_col='variant'
+)
+perturbator = NormalPerturbator(
+    target_col='order_value',
+    treatment_col='variant',
+    treatment='B',
+    average_effect=1,
+    scale=1
+)
 experiment_analysis_data = pd.merge(
     left = (
         data_270_to_365
-        .assign(
-            variant = lambda df: (
-                df.loc[:, 'customer_id']
-                .map(lambda x: np.random.default_rng(seed=x).choice(['A', 'B'], p=[0.5, 0.5]))
-            ),
-            order_value = lambda df: (
-                df.loc[:, 'order_value']
-                 + (df.loc[:, 'variant'] == 'B').astype(float)
-                 * np.random.default_rng(seed=42).normal(loc=1, scale=1, size=df.shape[0])
-            )
-        )
+        .pipe(splitter.assign_treatment_df)
+        .pipe(perturbator.perturbate)
     ),
     right = (
         data_180_to_270
@@ -639,7 +487,7 @@ variant__treatment = Variant(
     name='B',
     is_control=False
 )
-
+# Setup Hypothesis Test
 test__order_value = HypothesisTest(
     metric = metric__order_value,
     dimensions=[dimension__city_code],
@@ -655,7 +503,7 @@ test__order_value = HypothesisTest(
         'features_cupac_model': ['pre_n_orders', 'pre_aov']
     }
 )
-
+# Build analysis plan and run analysis
 analysis_plan = AnalysisPlan(
     tests = [test__order_value],
     variants = [variant__control, variant__treatment],
@@ -671,94 +519,3 @@ analysis_results = (
     .to_dataframe()
 )   
 print(analysis_results.round(2).T)
-
-# >>> # Prepare CUPAC training data
-# >>> cupac_training_data = pd.merge(
-# ...     left=data_180_to_270,
-# ...     right=(
-# ...         data_90_to_180
-# ...         .groupby('customer_id', as_index=False)
-# ...         .agg(
-# ...             pre_n_orders = ('order_time', 'count'),
-# ...             pre_aov = ('order_value', 'mean')
-# ...         )
-# ...     ),
-# ...     how='left',
-# ...     on='customer_id'
-# ... )
-# >>> # Prepare simulated experimental data
-# >>> experiment_analysis_data = pd.merge(
-# ...     left = (
-# ...         data_270_to_365
-# ...         .assign(
-# ...             variant = lambda df: (
-# ...                 df.loc[:, 'customer_id']
-# ...                 .map(lambda x: np.random.default_rng(seed=x).choice(['A', 'B'], p=[0.5, 0.5]))
-# ...             ),
-# ...             order_value = lambda df: (
-# ...                 df.loc[:, 'order_value']
-# ...                  + (df.loc[:, 'variant'] == 'B').astype(float)
-# ...                  * np.random.default_rng(seed=42).normal(loc=1, scale=1, size=df.shape[0])
-# ...             )
-# ...         )
-# ...     ),
-# ...     right = (
-# ...         data_180_to_270
-# ...         .groupby('customer_id', as_index=False)
-# ...         .agg(
-# ...             pre_n_orders = ('order_time', 'count'),
-# ...             pre_aov = ('order_value', 'mean')
-# ...         )
-# ...     ),
-# ...     how='left',
-# ...     on='customer_id'
-# ... )
-# >>> # Set up analysis plan
-# >>> metric__order_value = SimpleMetric(
-# ...     alias='AOV',
-# ...     name='order_value'
-# ... )
-# >>> dimension__city_code = Dimension(
-# ...     name='city_code',
-# ...     values=['MAD', 'BCN'],
-# ... )
-# >>> variant__control = Variant(
-# ...     name='A',
-# ...     is_control=True
-# ... )
-# >>> variant__treatment = Variant(
-# ...     name='B',
-# ...     is_control=False
-# ... )
-# ... 
-# >>> test__order_value = HypothesisTest(
-# ...     metric = metric__order_value,
-# ...     dimensions=[dimension__city_code],
-# ...     analysis_type = 'clustered_ols',
-# ...     analysis_config = {
-# ...         'target_col': 'order_value',
-# ...         'cluster_cols': ['customer_id'],
-# ...         'covariates': ['estimate_order_value']
-# ...     },
-# ...     cupac_config = {
-# ...         'cupac_model': HistGradientBoostingRegressor(),
-# ...         'target_col': 'order_value',
-# ...         'features_cupac_model': ['pre_n_orders', 'pre_aov']
-# ...     }
-# ... )
-# ... 
-# >>> analysis_plan = AnalysisPlan(
-# ...     tests = [test__order_value],
-# ...     variants = [variant__control, variant__treatment],
-# ...     variant_col = 'variant',
-# ...     alpha = 0.05
-# ... )
-# >>> analysis_results = (
-# ...     analysis_plan
-# ...     .analyze(
-# ...         exp_data = experiment_analysis_data,
-# ...         pre_exp_data = cupac_training_data
-# ...     )
-# ...     .to_dataframe()
-# ... )   
-# >>> print(analysis_results.round(2).T)

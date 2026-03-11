@@ -1,0 +1,37 @@
+<class 'pandas.core.frame.DataFrame'>
+RangeIndex: 423669 entries, 0 to 423668
+Data columns (total 5 columns):
+ #   Column       Non-Null Count   Dtype         
+---  ------       --------------   -----         
+ 0   customer_id  423669 non-null  int64         
+ 1   city_code    423669 non-null  object        
+ 2   order_time   423669 non-null  datetime64[ns]
+ 3   order_value  423669 non-null  float64       
+ 4   time_index   423669 non-null  int64         
+dtypes: datetime64[ns](1), float64(1), int64(2), object(1)
+memory usage: 16.2+ MB
+data_0_to_90.shape=(105129, 5)
+data_90_to_180.shape=(104777, 5)
+data_180_to_270.shape=(104641, 5)
+data_270_to_365.shape=(104396, 5)
+Estimated Power (Simulation without CUPAC): 0.340
+Estimated Power (Simulation with CUPAC): 0.830
+Estimated Power (Simulation): 0.120 in 1.95 seconds
+Estimated Power (Analytical): 0.116 in 0.17 seconds
+Estimated Power (Custom Implementation): 0.130
+Estimated Power (Switchback): 0.610
+                                        0              1              2
+metric_alias                          AOV            AOV            AOV
+control_variant_name                    A              A              A
+treatment_variant_name                  B              B              B
+control_variant_mean               110.18         110.04         110.49
+treatment_variant_mean             110.77         110.95         110.34
+analysis_type               clustered_ols  clustered_ols  clustered_ols
+ate                                   1.6           1.66           1.45
+ate_ci_lower                         0.87           0.79           0.13
+ate_ci_upper                         2.32           2.53           2.76
+p_value                               0.0            0.0           0.03
+std_error                            0.37           0.45           0.67
+dimension_name          __total_dimension      city_code      city_code
+dimension_value                     total            MAD            BCN
+alpha                                0.05           0.05           0.05
