@@ -39,6 +39,7 @@ from cluster_experiments import (
 # %% [markdown]
 # # Data Generation
 
+
 # %%
 def generate_data(sample_size=50_000, seed=42) -> pd.DataFrame:
     rng = np.random.default_rng(seed=seed)
@@ -130,6 +131,8 @@ print(f'{data_270_to_365.shape=}')
 
 # ## Code Chunk: Simulation-based power estimation under a clustered design
 
+# %%
+
 splitter = ClusteredSplitter(
     cluster_cols=['customer_id'],
 )
@@ -156,8 +159,10 @@ power_sim = sim_power_analysis.power_analysis(
 
 print(f'Estimated Power (Simulation without CUPAC): {power_sim:.3f}')
 
+# %% [markdown]
 # ## Code Chunk: Simulation-based power estimation under a clustered design with CUPAC
 
+# %%
 cupac_training_data = pd.merge(
     left=data_90_to_180,
     right=(
@@ -207,8 +212,12 @@ power_sim_cupac = sim_power_analysis_cupac.power_analysis(
 )
 
 print(f'Estimated Power (Simulation with CUPAC): {power_sim_cupac:.3f}')
+# %% [markdown]
 # # Non-Clustered Design
+
 # ### Data definitions
+
+# %%
 experiment_design_data = (
     data_180_to_270
     .groupby(
@@ -268,7 +277,10 @@ normal_duration = end - start
 
 print(f'Estimated Power (Analytical): {normal_power:.3f} in {normal_duration:.2f} seconds')
 
+# %% [markdown]
 # ## Code Chunk: Using the `mde_time_line` method
+
+# %%
 normal_power_analysis = NormalPowerAnalysis(
     splitter=splitter,
     analysis=analysis,
@@ -296,9 +308,13 @@ ax.set_yticks(ticks)
 _ = ax.set_yticklabels([f'{s:1,.2f}' for s in ticks], fontdict={'fontname': 'serif'})
 fig.savefig('mde_time_line.png')
 
+# %% [markdown]
 # # Custom Analysis Class
+
 # ## Code Chunk: Boostrap analysis
 
+
+# %%
 # Custom analysis definition
 class SimpleBootstrapNormalAnalysis(ExperimentAnalysis):
     """
@@ -367,8 +383,12 @@ custom_power = custom_power_analysis.power_analysis(
 )
 print(f'Estimated Power (Custom Implementation): {custom_power:.3f}')
 
+# %% [markdown]
 # # Switchback Design
+
 # ## Code Chunk: Switchback design with simulation-based power estimation
+
+# %%
 washover = ConstantWashover(
     washover_time_delta='30m'
 )
@@ -399,8 +419,10 @@ switchback_power = switchback_power_analysis.power_analysis(
 )
 print(f'Estimated Power (Switchback): {switchback_power:.3f}')
 
+# %% [markdown]
 # # Experiment Analysis
 
+# %%
 # Prepare CUPAC training data
 cupac_training_data = pd.merge(
     left=data_180_to_270,
