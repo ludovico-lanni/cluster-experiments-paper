@@ -256,7 +256,9 @@ sim_power = sim_power_analysis.power_analysis(
 )
 end = time.time()
 sim_duration = end - start
-print(f'Estimated Power (Simulation): {sim_power:.3f} in {sim_duration:.2f} seconds')
+print(f'Estimated Power (Simulation): {sim_power:.3f}' 
+    f' in {sim_duration:.2f} seconds'
+)
 
 # %%
 normal_power_analysis = NormalPowerAnalysis(
@@ -275,7 +277,10 @@ normal_power = normal_power_analysis.power_analysis(
 end = time.time()
 normal_duration = end - start
 
-print(f'Estimated Power (Analytical): {normal_power:.3f} in {normal_duration:.2f} seconds')
+print(
+    f'Estimated Power (Analytical): {normal_power:.3f}'
+    f' in {normal_duration:.2f} seconds'
+)
 
 # %% [markdown]
 # ## Code Chunk: Using the `mde_time_line` method
@@ -303,9 +308,19 @@ ax.plot(
 )
 ax.set_xlabel('Experiment Length (days)')
 ax.set_ylabel('Minimum Detectable Effect (MDE)')
-ticks = np.round(np.arange(round(mde_time_line_df['mde'].min(), 2), round(mde_time_line_df['mde'].max()+0.01, 2), step=0.01), 2)
+ticks = np.round(
+    np.arange(
+        round(mde_time_line_df['mde'].min(), 2),
+        round(mde_time_line_df['mde'].max()+0.01, 2),
+        step=0.01,
+    ),
+    2,
+)
 ax.set_yticks(ticks)
-_ = ax.set_yticklabels([f'{s:1,.2f}' for s in ticks], fontdict={'fontname': 'serif'})
+_ = ax.set_yticklabels(
+    [f'{s:1,.2f}' for s in ticks], 
+    fontdict={'fontname': 'serif'}
+)
 fig.savefig('mde_time_line.png')
 
 # %% [markdown]
