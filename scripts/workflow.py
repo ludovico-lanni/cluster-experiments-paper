@@ -1,3 +1,13 @@
+### REQUIREMENTS
+
+## PYTHON VERSION
+# "<3.13,>=3.9"
+
+## INSTALL DEPENDENCIES
+# pip install "cluster-experiments==0.27.0" "matplotlib>=3.9.4" "seaborn>=0.13.2"
+
+### REPLICATION SCRIPT
+
 # %%
 import time
 import pandas as pd
